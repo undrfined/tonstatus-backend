@@ -1,5 +1,5 @@
 import config from '../config';
-import { runCommand } from "../liteclient";
+import { getLastBlock, getShards, getTransactions } from "../liteclient";
 import { getWebservicePerformance, Webservice } from '../metrics/website';
 
 const express = require('express');
@@ -9,7 +9,17 @@ const app = express();
 app.use(cors());
 
 app.get('/', async (req, res) => {
-    res.send(await runCommand('allshards'))
+    const block = await getLastBlock();
+    const a = await getTransactions(block)
+    const b = await getShards(block);
+    console.log(a)
+    console.log(b)
+
+    res.send(JSON.stringify({
+        block,
+        shards: b,
+        transactions: a
+    }))
 });
 
 app.get('/webservices', async (req, res) => {
