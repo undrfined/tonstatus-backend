@@ -3,8 +3,10 @@ import { runCommand } from "../liteclient";
 import { getWebservicePerformance, Webservice } from '../metrics/website';
 
 const express = require('express');
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
 
 app.get('/', async (req, res) => {
     res.send(await runCommand('allshards'))
