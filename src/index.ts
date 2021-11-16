@@ -1,14 +1,9 @@
-import {runCommand} from './liteclient';
+import { setupMongo } from './mongo';
+import { setupExpress } from './express';
 
-const express = require('express')
-const app = express()
-const port = 8080;
+async function run() {
+    await setupMongo();
+    await setupExpress();
+}
 
-app.get('/', async (req, res) => {
-    res.send(await runCommand('allshards'))
-})
-
-app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`)
-})
-
+run();

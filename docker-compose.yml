@@ -12,8 +12,13 @@ services:
     volumes:
       - .:/app
       - node_modules:/app/node_modules
-    command: npm run dev
+    command: bash run.sh
     platform: linux/amd64
+  mongodb:
+    image: mongo:5.0
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=tonstatus
+      - MONGO_INITDB_ROOT_PASSWORD=tonstatus
 volumes:
   node_modules:
 
