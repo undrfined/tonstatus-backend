@@ -8,5 +8,9 @@ export async function setupMongo() {
     await mongo.connect();
 }
 
-export const webservicesDbContinuous = () => mongo.db('tonstatus').collection('webservicesPerformance');
-export const webservicesDbLast = () => mongo.db('tonstatus').collection('webservicesPerformanceLast');
+const db = () => mongo.db('tonstatus');
+
+export const webservicesDbContinuous = () => db().collection('webservicesPerformance');
+export const webservicesDbLast = () => db().collection('webservicesPerformanceLast');
+export const validatorsDbContinuous = () => db().collection('validatorsPerformanceLast');
+export const tpsDbContinuous = () => db().collection('tpsPerformanceLast');

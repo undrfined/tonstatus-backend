@@ -6,7 +6,7 @@ import {
     getWebservicePerformance,
     Webservice
 } from '../metrics/website';
-import { lol } from '../metrics/network';
+import { getTpsPerformance, getValidatorsPerformance } from '../metrics/network';
 
 const express = require('express');
 const cors = require('cors');
@@ -26,12 +26,29 @@ app.get('/', async (req, res) => {
         shards: b,
         transactions: a
     }))
+});
 
-    lol()
+app.get('/validators', async (req, res) => {
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    res.send(await getValidatorsPerformance(fromDate, toDate));
+});
+
+app.get('/tps', async (req, res) => {
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    res.send(await getTpsPerformance(fromDate, toDate));
 });
 
 app.get('/webservices', async (req, res) => {
-    const service = req.query['service'];
     const from = req.query['from'];
     const to = req.query['to'];
 
@@ -40,16 +57,12 @@ app.get('/webservices', async (req, res) => {
 
     const resolve = (webservice: Webservice) => getWebservicePerformance(webservice, fromDate, toDate);
 
-    if (service) {
-        res.send(await resolve(config.webservices.list.find(ws => ws.name === service) as Webservice));
-    } else {
-        const all = await Promise.all(
-            config.webservices.list
-                .map(service => resolve(service))
-        );
+    const all = await Promise.all(
+        config.webservices.list
+            .map(service => resolve(service))
+    );
 
-        res.send(all);
-    }
+    res.send(all);
 });
 
 app.get('/webservice-daily/:service', async (req, res) => {
