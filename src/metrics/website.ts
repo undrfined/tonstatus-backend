@@ -189,7 +189,6 @@ export async function saveWebserviceLastPerformanceMeasurement(measurement: Serv
 
 async function measureWebservicePerformance(webservice: Webservice): Promise<ServicePerformanceMeasurementV1> {
     const date = new Date();
-    date.setDate(date.getDate() - 1);
 
     let responseTime = 0;
     let up = true;
