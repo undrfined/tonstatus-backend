@@ -31,6 +31,7 @@ const config = {
            readBlocks: 0.3,
            statistics: 10,
            numberOfValidators: 10,
+           liteservers: 60
        }
     },
     http: {

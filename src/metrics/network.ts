@@ -1,6 +1,8 @@
 import config from "../config";
-import { checkLoadAll, getConfig34, getLastBlock, getShards, getTransactions } from "../liteclient";
+import {checkLoadAll, getConfig34, getLastBlock, getShards, getTransactions, runCommand} from "../liteclient";
 import { tpsDbContinuous, validatorsDbContinuous } from '../mongo';
+import * as fs from "fs";
+const { performance } = require('perf_hooks');
 
 interface ValidatorsMeasurementV1 {
     totalValidators: number,
@@ -235,3 +237,27 @@ const readNextBlock = async () => {
 }
 
 readNextBlock()
+
+
+const checkLiteservers = async () => {
+    fs.readFile('/config.json', 'utf8', function (err, data) {
+        if (err) throw err;
+        const obj = JSON.parse(data);
+        Object.keys(obj.liteservers).map(async l => {
+            const start = performance.now()
+            const result = await runCommand('last', Number(l))
+            const addr = result.split('\n')
+                    .find(l => l.startsWith('using liteserver'))
+                .match(/\[(.+?)]/)[1]
+            const time = performance.now() - start;
+            const block = result.split('\n').find(l => l.includes("latest masterchain block"))
+                .split(' ')[7]
+            // TODO update mongo
+            // TODO check if block is the same for all liteservers
+            console.log('response time', time, 'for', addr, 'block', block)
+        })
+    });
+    setTimeout(checkLiteservers, config.liteservers.intervals.liteservers * 1000)
+}
+
+checkLiteservers()
