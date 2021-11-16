@@ -1,6 +1,6 @@
 import config from '../config';
 import { runCommand } from "../liteclient";
-import { getAvgServicePerformance } from '../metrics/website';
+import { getServicePerformance } from '../metrics/website';
 
 const express = require('express');
 
@@ -18,7 +18,7 @@ app.get('/webservices', async (req, res) => {
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
 
-    const resolve = (service: string) => getAvgServicePerformance(service, fromDate, toDate);
+    const resolve = (service: string) => getServicePerformance(service, fromDate, toDate);
 
     if (service) {
         res.send(await resolve(service));

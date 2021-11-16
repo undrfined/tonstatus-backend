@@ -1,6 +1,7 @@
 const config = {
     webservices: {
         list: ['ton.org', 'ton.sh', 'toncenter.com'],
+        interval: 60, // in seconds
     },
     http: {
         host: 'localhost',
