@@ -18,7 +18,9 @@ interface TpsMeasurementV1 {
 let blocks = [];
 let oldBlock: string;
 let transNumTotal = 0;
+let blocksTotal = 0;
 let transNumTotalList = new Array(15 * 6).fill(0);
+let blockRateList = new Array(15 * 6).fill(0);
 
 let lastValidatorsMeasurement: ValidatorsMeasurementV1 = {
     totalValidators: 0,
@@ -148,22 +150,30 @@ setInterval(async () => {
 
 }, config.liteservers.intervals.numberOfValidators * 1000);
 
-setInterval(async () => {
+const fetchNextBlock = async () => {
     const block = await getLastBlock();
     if (block !== oldBlock) {
         oldBlock = block;
         blocks.push(block);
+        blocksTotal++;
     }
-}, config.liteservers.intervals.scanBlocks * 1000)
+    setTimeout(fetchNextBlock, config.liteservers.intervals.scanBlocks * 1000)
+}
+
+
+fetchNextBlock()
 
 setInterval(async () => {
     const date = new Date();
 
     transNumTotalList.shift();
     transNumTotalList.push(transNumTotal)
+    blockRateList.shift();
+    blockRateList.push(blocksTotal);
     // console.log(' got ', transNumTotal, transNumTotalList);
 
     transNumTotal = 0;
+    blocksTotal = 0;
 
     const data = transNumTotalList.slice().reverse();
     const tps1minute = data.slice(0, 6);
@@ -173,6 +183,16 @@ setInterval(async () => {
         tps1minute.reduce((acc, el) => acc + el / tps1minute.length),
         tps5minute.reduce((acc, el) => acc + el / tps5minute.length),
         tps15minute.reduce((acc, el) => acc + el / tps15minute.length),
+    ]
+
+    const dataBlocks = blockRateList.slice().reverse();
+    const blocks1minute = dataBlocks.slice(0, 6);
+    const blocks5minute = dataBlocks.slice(0, 5 * 6);
+    const blocks15minute = dataBlocks.slice(0, 15 * 6);
+    const avgBlocks = [
+        blocks1minute.reduce((acc, el) => acc + el / blocks1minute.length),
+        blocks5minute.reduce((acc, el) => acc + el / blocks5minute.length),
+        blocks15minute.reduce((acc, el) => acc + el / blocks15minute.length),
     ]
     // console.log(tps1minute)
     // console.log(tps5minute)
@@ -188,9 +208,10 @@ setInterval(async () => {
     await tpsDbContinuous().insertOne(lastTpsMeasurement);
 
     console.log('tps 1 minute / 5 / 15', avg)
+    console.log('blocks 1 minute / 5 / 15', avgBlocks)
 }, config.liteservers.intervals.statistics * 1000)
 
-setInterval(async () => {
+const readNextBlock = async () => {
     if (blocks.length === 0) {
         return;
     }
@@ -210,4 +231,7 @@ setInterval(async () => {
     transNumTotal += transNum;
 
     console.log('read blocks')
-}, config.liteservers.intervals.readBlocks * 1000)
+    setTimeout(readNextBlock, config.liteservers.intervals.readBlocks * 1000)
+}
+
+readNextBlock()

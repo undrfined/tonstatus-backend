@@ -56,6 +56,17 @@ export function getConfig34() {
             totalValidators: Number(l.match(/total:(\d+)/)[1])
         }))
 }
+
+
+export function getConfigAddr() {
+    return runCommand('getconfig 0')
+        .then(l => "-1:" + l.match(/config_addr:x(.+?)\)/)[1])
+}
+
+export function getOffers(fullConfigAddr: string) {
+    return runCommand(`runmethodfull ${fullConfigAddr} list_proposals`)
+}
+
 export function getFullElectorAddr(): Promise<string> {
     return runCommand('getconfig 1')
         .then(l => "-1:" + l.match(/elector_addr:x(.+?)\)/)[1])
