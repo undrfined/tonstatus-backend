@@ -25,6 +25,14 @@ const config = {
         intervalContinuous: 60, // in seconds
         intervalLast: 5, // in seconds
     },
+    liteservers: {
+       intervals: {
+           scanBlocks: 1,
+           readBlocks: 0.3,
+           statistics: 10,
+           numberOfValidators: 10,
+       }
+    },
     http: {
         host: 'localhost',
         port: 8080,

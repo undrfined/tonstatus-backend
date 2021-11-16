@@ -1,6 +1,7 @@
 import config from '../config';
 import { getLastBlock, getShards, getTransactions } from "../liteclient";
 import { getWebservicePerformance, Webservice } from '../metrics/website';
+import { lol } from '../metrics/network';
 
 const express = require('express');
 const cors = require('cors');
@@ -20,6 +21,8 @@ app.get('/', async (req, res) => {
         shards: b,
         transactions: a
     }))
+
+    lol()
 });
 
 app.get('/webservices', async (req, res) => {

@@ -4,16 +4,65 @@ function escapeShell(cmd: string) {
     return '"' + cmd.replace(/(["'$`\\])/g, '\\$1') + '"';
 }
 
-export function runCommand(command: string): Promise<string> {
+export function runCommand(command: string, liteserver?: number): Promise<string> {
     return new Promise((resolve, reject) => {
-        exec('/ton/build/lite-client/lite-client --verbosity 0 --global-config /config.json --cmd ' + escapeShell(command), (err, stdout, stderr) => {
+        exec('/ton/build/lite-client/lite-client --verbosity 0 --global-config /config.json --cmd '
+            + escapeShell(command) + (liteserver != null ? ' -i ' + liteserver : ''),
+            (err, stdout, stderr) => {
             if(err) {
-                reject(err);
+                // reject(err);
             } else {
                 resolve(stdout)
             }
         })
     })
+}
+
+export function checkLoadAll() {
+    const end = Math.floor(Date.now() / 1000) - 60;
+    const start = end - 2000;
+    return runCommand(`checkloadall ${start} ${end}`).then(l =>
+        l
+            .split('\n')
+            .filter(l => l.includes('pubkey') && l.includes('val'))
+            .map(l => l.split(' '))
+            .map(l => {
+                const [masterBlocksCreated, workBlocksCreated] = l[6].replace(/\)/, '').replace(/\(/, '')
+                    .split(',').map(Number);
+
+                const [masterBlocksExpected, workBlocksExpected] = l[8].replace(/\)/, '').replace(/\(/, '')
+                    .split(',').map(Number);
+
+                const mr = masterBlocksExpected === 0 ? 0 : masterBlocksCreated / masterBlocksExpected;
+                const wr = workBlocksExpected === 0 ? 0 : workBlocksCreated / workBlocksExpected;
+                const r = (mr + wr) / 2
+                const efficiency = Math.round(r * 100)
+                return ({
+                    id: l[1].replace('#', '').replace(':', ''),
+                    pubkey: l[4].replace(',', ''),
+                    masterBlocksCreated,
+                    workBlocksCreated,
+                    masterBlocksExpected,
+                    workBlocksExpected,
+                    online: efficiency > 10
+                });
+            })
+    )
+}
+
+export function getConfig34() {
+    return runCommand('getconfig 34')
+        .then(l => ({
+            totalValidators: Number(l.match(/total:(\d+)/)[1])
+        }))
+}
+export function getFullElectorAddr(): Promise<string> {
+    return runCommand('getconfig 1')
+        .then(l => "-1:" + l.match(/elector_addr:x(.+?)\)/)[1])
+}
+
+export function getActiveElectionId(fullElectorAddr: string) {
+    return runCommand(`runmethodfull ${fullElectorAddr} participant_list_extended`)
 }
 
 export function getLastBlock(): Promise<string> {
