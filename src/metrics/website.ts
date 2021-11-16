@@ -1,5 +1,5 @@
 import needle from 'needle';
-import { mongo } from '../mongo';
+import { webservicesDbContinuous, webservicesDbLast } from '../mongo';
 import config from '../config';
 
 const { performance } = require('perf_hooks');
@@ -17,6 +17,14 @@ interface ServicePerformanceMeasurementV1 {
     up: boolean;
 }
 
+interface DateServicePerformanceMeasurementV1 {
+    service: string;
+    date: Date;
+    avgResponseTime: number;
+    uptime: number;
+    recordsCount: number;
+}
+
 interface ServicePerformanceV1 {
     service: string;
     from: Date;
@@ -26,9 +34,6 @@ interface ServicePerformanceV1 {
     uptime: number;
     lastCheck: Date | null;
 }
-
-const dbContinuous = () => mongo.db('tonstatus').collection('webservicesPerformance');
-const dbLast = () => mongo.db('tonstatus').collection('webservicesPerformanceLast');
 
 export async function measureWebsiteResponseTimeMs(url: string): Promise<number> {
     const t0 = performance.now();
@@ -41,14 +46,6 @@ export async function measureWebsiteResponseTimeMs(url: string): Promise<number>
 }
 
 export async function getWebservicePerformance(webservice: Webservice, from: Date | undefined, to: Date | undefined): Promise<ServicePerformanceV1> {
-    if (!from) {
-        from = new Date(0);
-    }
-
-    if (!to) {
-        to = new Date();
-    }
-
     const measurements = await getWebservicePerformanceMeasurements(webservice, from, to);
     const lastMeasurement = await getWebserviceLastPerformanceMeasurement(webservice);
 
@@ -76,8 +73,93 @@ export async function getWebservicePerformance(webservice: Webservice, from: Dat
     };
 }
 
-export async function getWebservicePerformanceMeasurements(webservice: Webservice, from: Date, to: Date): Promise<ServicePerformanceMeasurementV1[]> {
-    const all = await dbContinuous().find().toArray();
+export async function getWebserviceDailyPerformanceMeasurement(webservice: Webservice, from: Date | undefined, to: Date | undefined): Promise<DateServicePerformanceMeasurementV1[]> {
+    const measurements = await getWebservicePerformanceMeasurements(webservice, from, to);
+
+    const daily = {} as { [key: number]: ServicePerformanceMeasurementV1[] };
+
+    for (const measurement of measurements) {
+        const date = measurement.date;
+        date.setHours(0);
+        date.setMinutes(0);
+        date.setSeconds(0);
+        date.setMilliseconds(0);
+
+        if (!daily[+date]) {
+            daily[+date] = [];
+        }
+
+        daily[+date].push(measurement);
+    }
+
+    return Object.entries(daily).map(([date, measurements]): DateServicePerformanceMeasurementV1 => {
+        const totalResponseTime = measurements
+            .filter(measurement => measurement.up)
+            .map(doc => doc.responseTime)
+            .reduce((p, c) => p + c, 0);
+
+        const avgResponseTime = measurements.length ? totalResponseTime / measurements.length : 0;
+
+        const uptime = measurements.length ? measurements.filter(m => m.up).length / measurements.length * 100 : 0
+
+        return {
+            service: webservice.name,
+            avgResponseTime,
+            uptime,
+            date: new Date(Number(date)),
+            recordsCount: measurements.length,
+        };
+    });
+}
+
+export async function getWebserviceHourlyPerformanceMeasurement(webservice: Webservice, from: Date | undefined, to: Date | undefined): Promise<DateServicePerformanceMeasurementV1[]> {
+    const measurements = await getWebservicePerformanceMeasurements(webservice, from, to);
+
+    const daily = {} as { [key: number]: ServicePerformanceMeasurementV1[] };
+
+    for (const measurement of measurements) {
+        const date = measurement.date;
+        date.setMinutes(0);
+        date.setSeconds(0);
+        date.setMilliseconds(0);
+
+        if (!daily[+date]) {
+            daily[+date] = [];
+        }
+
+        daily[+date].push(measurement);
+    }
+
+    return Object.entries(daily).map(([date, measurements]): DateServicePerformanceMeasurementV1 => {
+        const totalResponseTime = measurements
+            .filter(measurement => measurement.up)
+            .map(doc => doc.responseTime)
+            .reduce((p, c) => p + c, 0);
+
+        const avgResponseTime = measurements.length ? totalResponseTime / measurements.length : 0;
+
+        const uptime = measurements.length ? measurements.filter(m => m.up).length / measurements.length * 100 : 0
+
+        return {
+            service: webservice.name,
+            avgResponseTime,
+            uptime,
+            date: new Date(Number(date)),
+            recordsCount: measurements.length,
+        };
+    });
+}
+
+export async function getWebservicePerformanceMeasurements(webservice: Webservice, from: Date | undefined, to: Date | undefined): Promise<ServicePerformanceMeasurementV1[]> {
+    if (!from) {
+        from = new Date(0);
+    }
+
+    if (!to) {
+        to = new Date();
+    }
+
+    const all = await webservicesDbContinuous().find().toArray();
 
     const measurements = all.map(m => ({ ...m, date: new Date(m.date) })) as ServicePerformanceMeasurementV1[];
 
@@ -89,16 +171,16 @@ export async function getWebservicePerformanceMeasurements(webservice: Webservic
 }
 
 export async function getWebserviceLastPerformanceMeasurement(webservice: Webservice): Promise<ServicePerformanceMeasurementV1> {
-    return (await dbLast().find().filter({ service: webservice.name }).toArray())
+    return (await webservicesDbLast().find().filter({ service: webservice.name }).toArray())
         .map(m => ({ ...m, date: new Date(m.date) }))[0] as ServicePerformanceMeasurementV1;
 }
 
 export async function saveWebservicePerformanceMeasurement(measurement: ServicePerformanceMeasurementV1): Promise<void> {
-    await dbContinuous().insertOne(measurement);
+    await webservicesDbContinuous().insertOne(measurement);
 }
 
 export async function saveWebserviceLastPerformanceMeasurement(measurement: ServicePerformanceMeasurementV1): Promise<void> {
-    await dbLast().findOneAndUpdate(
+    await webservicesDbLast().findOneAndUpdate(
         { service: measurement.service },
         { $set: measurement, },
         { upsert: true }
@@ -107,6 +189,7 @@ export async function saveWebserviceLastPerformanceMeasurement(measurement: Serv
 
 async function measureWebservicePerformance(webservice: Webservice): Promise<ServicePerformanceMeasurementV1> {
     const date = new Date();
+    date.setDate(date.getDate() - 1);
 
     let responseTime = 0;
     let up = true;

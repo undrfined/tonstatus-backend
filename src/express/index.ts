@@ -1,6 +1,11 @@
 import config from '../config';
 import { getLastBlock, getShards, getTransactions } from "../liteclient";
-import { getWebservicePerformance, Webservice } from '../metrics/website';
+import {
+    getWebserviceDailyPerformanceMeasurement,
+    getWebserviceHourlyPerformanceMeasurement,
+    getWebservicePerformance,
+    Webservice
+} from '../metrics/website';
 import { lol } from '../metrics/network';
 
 const express = require('express');
@@ -45,6 +50,36 @@ app.get('/webservices', async (req, res) => {
 
         res.send(all);
     }
+});
+
+app.get('/webservice-daily/:service', async (req, res) => {
+    const service = req.params['service'];
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    const resolve = (webservice: Webservice) => getWebserviceDailyPerformanceMeasurement(webservice, fromDate, toDate);
+
+    const webservice = config.webservices.list.find(ws => ws.name === service) as Webservice;
+
+    res.send(await resolve(webservice));
+});
+
+app.get('/webservice-hourly/:service', async (req, res) => {
+    const service = req.params['service'];
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    const resolve = (webservice: Webservice) => getWebserviceHourlyPerformanceMeasurement(webservice, fromDate, toDate);
+
+    const webservice = config.webservices.list.find(ws => ws.name === service) as Webservice;
+
+    res.send(await resolve(webservice));
 });
 
 export async function setupExpress() {

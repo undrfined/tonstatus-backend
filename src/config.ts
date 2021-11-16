@@ -22,7 +22,7 @@ const config = {
                 url: 'https://ton.org/bridge/bsc'
             }
         ],
-        intervalContinuous: 60, // in seconds
+        intervalContinuous: 1, // in seconds
         intervalLast: 5, // in seconds
     },
     liteservers: {
