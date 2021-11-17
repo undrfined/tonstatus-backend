@@ -1,5 +1,4 @@
 import config from '../config';
-import { getLastBlock, getShards, getTransactions } from "../liteclient";
 import {
     getWebserviceDailyPerformanceMeasurement,
     getWebserviceHourlyPerformanceMeasurement,
@@ -7,26 +6,14 @@ import {
     Webservice
 } from '../metrics/website';
 import { getTpsPerformance, getValidatorsPerformance } from '../metrics/network';
+import * as path from "path";
 
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
-
-app.get('/', async (req, res) => {
-    const block = await getLastBlock();
-    const a = await getTransactions(block)
-    const b = await getShards(block);
-    console.log(a)
-    console.log(b)
-
-    res.send(JSON.stringify({
-        block,
-        shards: b,
-        transactions: a
-    }))
-});
+app.use(express.static(path.join(__dirname, "../../frontend", "build")));
 
 app.get('/validators', async (req, res) => {
     const from = req.query['from'];

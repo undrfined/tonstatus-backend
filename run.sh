@@ -1,3 +1,4 @@
 #!/bin/bash
 
-npm install && npm run dev
+npm install --prefix frontend && npm install && npm start
+#npm start

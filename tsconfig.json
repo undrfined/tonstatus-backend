@@ -6,5 +6,8 @@
     "lib": [
       "ESNext"
     ]
-  }
+  },
+  "include": [
+    "./src/**/*"
+  ]
 }
