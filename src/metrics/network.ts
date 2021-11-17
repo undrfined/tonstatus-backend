@@ -154,28 +154,39 @@ export async function getTpsPerformance(from: Date | undefined, to: Date | undef
 setInterval(async () => {
     const date = new Date();
 
-    const a = await getConfig34();
-    const b = await checkLoadAll();
-    const onlineValidators = b.map(l => l.online).filter(Boolean).length;
-    const totalValidators = a.totalValidators;
-    console.log('validators online/total ' + onlineValidators + "/" + totalValidators);
+    try {
 
-    lastValidatorsMeasurement = {
-        totalValidators,
-        onlineValidators,
-        date,
-    };
+        const a = await getConfig34();
+        const b = await checkLoadAll();
+        const onlineValidators = b.map(l => l.online).filter(Boolean).length;
+        const totalValidators = a.totalValidators;
+        console.log('validators online/total ' + onlineValidators + "/" + totalValidators);
 
-    await validatorsDbContinuous().insertOne(lastValidatorsMeasurement);
+        lastValidatorsMeasurement = {
+            totalValidators,
+            onlineValidators,
+            date,
+        };
+
+        await validatorsDbContinuous().insertOne(lastValidatorsMeasurement);
+    } catch (e) {
+
+    }
 
 }, config.liteservers.intervals.numberOfValidators * 1000);
 
 const fetchNextBlock = async () => {
-    const block = await getLastBlock();
-    if (block !== oldBlock) {
-        oldBlock = block;
-        blocks.push(block);
-        blocksTotal++;
+    try {
+        console.log('fetching block...')
+        const block = await getLastBlock();
+        console.log('fetched block', block)
+        if (block !== oldBlock) {
+            oldBlock = block;
+            blocks.push(block);
+            blocksTotal++;
+        }
+    } catch (e) {
+
     }
     setTimeout(fetchNextBlock, config.liteservers.intervals.scanBlocks * 1000)
 }
@@ -233,24 +244,34 @@ setInterval(async () => {
 
 const readNextBlock = async () => {
     if (blocks.length === 0) {
+        setTimeout(readNextBlock, config.liteservers.intervals.readBlocks * 1000)
+
         return;
     }
     const block = blocks.shift()
 
-    if (!block) return;
+    if (!block) {
+        setTimeout(readNextBlock, config.liteservers.intervals.readBlocks * 1000)
 
-
-    const transactions = await getTransactions(block);
-    let transNum = transactions.length;
-    const shards = await getShards(block);
-
-    for (const shard of shards) {
-        const transactionsShard = await getTransactions(shard.block);
-        transNum += transactionsShard.length;
+        return;
     }
-    transNumTotal += transNum;
 
-    console.log('read blocks')
+    try {
+
+        const transactions = await getTransactions(block);
+        let transNum = transactions.length;
+        const shards = await getShards(block);
+
+        for (const shard of shards) {
+            const transactionsShard = await getTransactions(shard.block);
+            transNum += transactionsShard.length;
+        }
+        transNumTotal += transNum;
+
+        console.log('read blocks')
+    }catch (e) {
+
+    }
     setTimeout(readNextBlock, config.liteservers.intervals.readBlocks * 1000)
 }
 
