@@ -1,6 +1,6 @@
 import config from "../config";
 import { checkLoadAll, getConfig34, getLastBlock, getShards, getTransactions, runCommand } from "../liteclient";
-import { tpsDbContinuous, validatorsDbContinuous } from '../mongo';
+import { blocksDbContinuous, liteserversDbContinuous, tpsDbContinuous, validatorsDbContinuous } from '../mongo';
 import * as fs from "fs";
 
 const { performance } = require('perf_hooks');
@@ -26,11 +26,41 @@ interface TpsMeasurementV1 {
     date: Date;
 }
 
+interface BlocksMeasurementV1 {
+    blocks1minute: number;
+    blocks5minute: number;
+    blocks15minute: number;
+    date: Date;
+}
+
+interface LiteserversMeasurementV1 {
+    online: any[];
+    offline: any[];
+    averageResponseTime: number;
+    outOfSync: any[];
+    date: Date;
+}
+
 interface TpsPerformanceV1 {
     last: TpsMeasurementV1;
     avgTps1Minute: number;
     avgTps5Minute: number;
     avgTps15Minute: number;
+    from: Date;
+    to: Date;
+}
+
+interface BlocksPerformanceV1 {
+    last: BlocksMeasurementV1;
+    avgBlocks1Minute: number;
+    avgBlocks5Minute: number;
+    avgBlocks15Minute: number;
+    from: Date;
+    to: Date;
+}
+
+interface LiteserversPerformanceV1 {
+    last: LiteserversMeasurementV1;
     from: Date;
     to: Date;
 }
@@ -51,6 +81,19 @@ let lastTpsMeasurement: TpsMeasurementV1 = {
     tps1minute: 0,
     tps5minute: 0,
     tps15minute: 0,
+    date: new Date(),
+};
+let lastBlocksMeasurement: BlocksMeasurementV1 = {
+    blocks1minute: 0,
+    blocks5minute: 0,
+    blocks15minute: 0,
+    date: new Date(),
+};
+let lastLiteserversMeasurement: LiteserversMeasurementV1 = {
+    online: [],
+    offline: [],
+    averageResponseTime: 0,
+    outOfSync: [],
     date: new Date(),
 };
 
@@ -85,6 +128,44 @@ export async function getTpsMeasurements(from: Date | undefined, to: Date | unde
     const all = await tpsDbContinuous().find().toArray();
 
     const measurements = all.map(m => ({ ...m, date: new Date(m.date) })) as TpsMeasurementV1[];
+
+    return measurements.filter(doc =>
+        doc.date >= from &&
+        doc.date <= to
+    );
+}
+
+export async function getBlocksMeasurements(from: Date | undefined, to: Date | undefined): Promise<BlocksMeasurementV1[]> {
+    if (!from) {
+        from = new Date(0);
+    }
+
+    if (!to) {
+        to = new Date();
+    }
+
+    const all = await blocksDbContinuous().find().toArray();
+
+    const measurements = all.map(m => ({ ...m, date: new Date(m.date) })) as BlocksMeasurementV1[];
+
+    return measurements.filter(doc =>
+        doc.date >= from &&
+        doc.date <= to
+    );
+}
+
+export async function getLiteserversMeasurements(from: Date | undefined, to: Date | undefined): Promise<LiteserversMeasurementV1[]> {
+    if (!from) {
+        from = new Date(0);
+    }
+
+    if (!to) {
+        to = new Date();
+    }
+
+    const all = await blocksDbContinuous().find().toArray();
+
+    const measurements = all.map(m => ({ ...m, date: new Date(m.date) })) as LiteserversMeasurementV1[];
 
     return measurements.filter(doc =>
         doc.date >= from &&
@@ -146,6 +227,51 @@ export async function getTpsPerformance(from: Date | undefined, to: Date | undef
         avgTps1Minute,
         avgTps5Minute,
         avgTps15Minute,
+        from,
+        to,
+    };
+}
+
+export async function getBlocksPerformance(from: Date | undefined, to: Date | undefined): Promise<BlocksPerformanceV1> {
+    if (!from) {
+        from = new Date(0);
+    }
+
+    if (!to) {
+        to = new Date();
+    }
+
+    const measurements = await getBlocksMeasurements(from, to);
+
+    const totalBlocks = measurements
+        .map(doc => [doc.blocks1minute, doc.blocks5minute, doc.blocks15minute])
+        .reduce((p, c) => [p[0] + c[0], p[1] + c[1], p[2] + c[2]], [0, 0, 0]);
+
+    const avgBlocks1Minute = measurements.length ? totalBlocks[0] / measurements.length : 0;
+    const avgBlocks5Minute = measurements.length ? totalBlocks[1] / measurements.length : 0;
+    const avgBlocks15Minute = measurements.length ? totalBlocks[2] / measurements.length : 0;
+
+    return {
+        last: lastBlocksMeasurement,
+        avgBlocks1Minute,
+        avgBlocks5Minute,
+        avgBlocks15Minute,
+        from,
+        to,
+    };
+}
+
+export async function getLiteserversPerformance(from: Date | undefined, to: Date | undefined): Promise<LiteserversPerformanceV1> {
+    if (!from) {
+        from = new Date(0);
+    }
+
+    if (!to) {
+        to = new Date();
+    }
+
+    return {
+        last: lastLiteserversMeasurement,
         from,
         to,
     };
@@ -236,7 +362,15 @@ setInterval(async () => {
         date,
     };
 
+    lastBlocksMeasurement = {
+        blocks1minute: avgBlocks[0],
+        blocks5minute: avgBlocks[1],
+        blocks15minute: avgBlocks[2],
+        date,
+    };
+
     await tpsDbContinuous().insertOne(lastTpsMeasurement);
+    await blocksDbContinuous().insertOne(lastBlocksMeasurement);
 
     console.log('tps 1 minute / 5 / 15', avg)
     console.log('blocks 1 minute / 5 / 15', avgBlocks)
@@ -269,7 +403,7 @@ const readNextBlock = async () => {
         transNumTotal += transNum;
 
         console.log('read blocks')
-    }catch (e) {
+    } catch (e) {
 
     }
     setTimeout(readNextBlock, config.liteservers.intervals.readBlocks * 1000)
@@ -295,19 +429,21 @@ const checkLiteservers = async () => {
                 const start = performance.now()
                 const result = await runCommand('last', Number(l))
                 const addr = result.split('\n')
-                .find(l => l.startsWith('using liteserver'))
+                    .find(l => l.startsWith('using liteserver'))
                     .match(/\[(.+?)]/)[1]
                 const time = performance.now() - start;
                 const block = result.split('\n').find(l => l.includes("latest masterchain block"))
                     .split(' ')[7]
                 const blockNumber = Number(block.split(':')[0].split(',')[2].replace(')', ''))
-                return {time, addr, block, blockNumber};
+                return { time, addr, block, blockNumber };
             } catch (e) {
                 return {
                     time: -1, addr: intToIP(obj.liteservers[l].ip) + ":" + obj.liteservers[l].port, block: ""
                 };
             }
         }))
+
+        const date = new Date();
 
         const availableLiteservers = syncStates.filter(l => l.time !== -1);
         const maxBlockNumber = Math.max(...availableLiteservers.map(l => l.blockNumber));
@@ -319,6 +455,16 @@ const checkLiteservers = async () => {
         console.log('Offline: ', unavailableLiteservers.map(l => l.addr))
         console.log('Average response time: ', averageResponseTime + 'ms')
         console.log('Out of sync: ', outOfSyncLiteservers.map(l => l.addr))
+
+        lastLiteserversMeasurement = {
+            online: availableLiteservers.map(l => l.addr),
+            offline: unavailableLiteservers.map(l => l.addr),
+            averageResponseTime: averageResponseTime,
+            outOfSync: outOfSyncLiteservers.map(l => l.addr),
+            date,
+        };
+
+        await liteserversDbContinuous().insertOne(lastLiteserversMeasurement);
 
         // TODO update mongo and express
     });

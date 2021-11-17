@@ -5,7 +5,12 @@ import {
     getWebservicePerformance,
     Webservice
 } from '../metrics/website';
-import { getTpsPerformance, getValidatorsPerformance } from '../metrics/network';
+import {
+    getBlocksPerformance,
+    getLiteserversPerformance,
+    getTpsPerformance,
+    getValidatorsPerformance
+} from '../metrics/network';
 import * as path from "path";
 
 const express = require('express');
@@ -33,6 +38,26 @@ app.get('/tps', async (req, res) => {
     const toDate = to ? new Date(to) : undefined;
 
     res.send(await getTpsPerformance(fromDate, toDate));
+});
+
+app.get('/blocks', async (req, res) => {
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    res.send(await getBlocksPerformance(fromDate, toDate));
+});
+
+app.get('/liteservers', async (req, res) => {
+    const from = req.query['from'];
+    const to = req.query['to'];
+
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    res.send(await getLiteserversPerformance(fromDate, toDate));
 });
 
 app.get('/webservices', async (req, res) => {
