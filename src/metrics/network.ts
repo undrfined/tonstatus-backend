@@ -1,20 +1,38 @@
 import config from "../config";
-import {checkLoadAll, getConfig34, getLastBlock, getShards, getTransactions, runCommand} from "../liteclient";
+import { checkLoadAll, getConfig34, getLastBlock, getShards, getTransactions, runCommand } from "../liteclient";
 import { tpsDbContinuous, validatorsDbContinuous } from '../mongo';
 import * as fs from "fs";
+
 const { performance } = require('perf_hooks');
 
 interface ValidatorsMeasurementV1 {
-    totalValidators: number,
-    onlineValidators: number,
-    date: Date,
+    totalValidators: number;
+    onlineValidators: number;
+    date: Date;
+}
+
+interface ValidatorsPerformanceV1 {
+    last: ValidatorsMeasurementV1;
+    avgTotalValidators: number;
+    avgOnlineValidators: number;
+    from: Date;
+    to: Date;
 }
 
 interface TpsMeasurementV1 {
-    tps1minute: number,
-    tps5minute: number,
-    tps15minute: number,
-    date: Date,
+    tps1minute: number;
+    tps5minute: number;
+    tps15minute: number;
+    date: Date;
+}
+
+interface TpsPerformanceV1 {
+    last: TpsMeasurementV1;
+    avgTps1Minute: number;
+    avgTps5Minute: number;
+    avgTps15Minute: number;
+    from: Date;
+    to: Date;
 }
 
 let blocks = [];
@@ -74,7 +92,7 @@ export async function getTpsMeasurements(from: Date | undefined, to: Date | unde
     );
 }
 
-export async function getValidatorsPerformance(from: Date | undefined, to: Date | undefined): Promise<any> {
+export async function getValidatorsPerformance(from: Date | undefined, to: Date | undefined): Promise<ValidatorsPerformanceV1> {
     if (!from) {
         from = new Date(0);
     }
@@ -104,7 +122,7 @@ export async function getValidatorsPerformance(from: Date | undefined, to: Date 
     };
 }
 
-export async function getTpsPerformance(from: Date | undefined, to: Date | undefined): Promise<any> {
+export async function getTpsPerformance(from: Date | undefined, to: Date | undefined): Promise<TpsPerformanceV1> {
     if (!from) {
         from = new Date(0);
     }
@@ -256,7 +274,7 @@ const checkLiteservers = async () => {
                 const start = performance.now()
                 const result = await runCommand('last', Number(l))
                 const addr = result.split('\n')
-                    .find(l => l.startsWith('using liteserver'))
+                .find(l => l.startsWith('using liteserver'))
                     .match(/\[(.+?)]/)[1]
                 const time = performance.now() - start;
                 const block = result.split('\n').find(l => l.includes("latest masterchain block"))

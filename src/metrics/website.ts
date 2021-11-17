@@ -33,6 +33,7 @@ interface ServicePerformanceV1 {
     up: boolean;
     uptime: number;
     lastCheck: Date | null;
+    last24Hours: DateServicePerformanceMeasurementV1[],
 }
 
 export async function measureWebsiteResponseTimeMs(url: string): Promise<number> {
@@ -62,6 +63,12 @@ export async function getWebservicePerformance(webservice: Webservice, from: Dat
 
     const lastCheck = lastMeasurement?.date ?? null;
 
+    const now = new Date();
+    const sub24 = new Date();
+    sub24.setHours(sub24.getHours()-24);
+
+    const last24Hours = await getWebserviceHourlyPerformanceMeasurement(webservice, sub24, now);
+
     return {
         service: webservice.name,
         avgResponseTime,
@@ -70,6 +77,7 @@ export async function getWebservicePerformance(webservice: Webservice, from: Dat
         up,
         uptime,
         lastCheck,
+        last24Hours,
     };
 }
 
