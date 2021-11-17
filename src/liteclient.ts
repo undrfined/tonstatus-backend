@@ -8,9 +8,12 @@ export function runCommand(command: string, liteserver?: number): Promise<string
     return new Promise((resolve, reject) => {
         exec('/ton/build/lite-client/lite-client --verbosity 0 --global-config /config.json --cmd '
             + escapeShell(command) + (liteserver != null ? ' -i ' + liteserver : ''),
+            {timeout: 30 * 1000},
             (err, stdout, stderr) => {
-            if(err) {
-                // reject(err);
+            if(stderr) {
+                reject(stderr)
+            } else if(err) {
+                reject(err);
             } else {
                 resolve(stdout)
             }

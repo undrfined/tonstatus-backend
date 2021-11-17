@@ -238,25 +238,52 @@ const readNextBlock = async () => {
 
 readNextBlock()
 
+function intToIP(int) {
+    var part1 = int & 255;
+    var part2 = ((int >> 8) & 255);
+    var part3 = ((int >> 16) & 255);
+    var part4 = ((int >> 24) & 255);
+
+    return part4 + "." + part3 + "." + part2 + "." + part1;
+}
 
 const checkLiteservers = async () => {
-    fs.readFile('/config.json', 'utf8', function (err, data) {
+    fs.readFile('/config.json', 'utf8', async function (err, data) {
         if (err) throw err;
         const obj = JSON.parse(data);
-        Object.keys(obj.liteservers).map(async l => {
-            const start = performance.now()
-            const result = await runCommand('last', Number(l))
-            const addr = result.split('\n')
+        const syncStates = await Promise.all(Object.keys(obj.liteservers).map(async l => {
+            try {
+                const start = performance.now()
+                const result = await runCommand('last', Number(l))
+                const addr = result.split('\n')
                     .find(l => l.startsWith('using liteserver'))
-                .match(/\[(.+?)]/)[1]
-            const time = performance.now() - start;
-            const block = result.split('\n').find(l => l.includes("latest masterchain block"))
-                .split(' ')[7]
-            // TODO update mongo
-            // TODO check if block is the same for all liteservers
-            console.log('response time', time, 'for', addr, 'block', block)
-        })
+                    .match(/\[(.+?)]/)[1]
+                const time = performance.now() - start;
+                const block = result.split('\n').find(l => l.includes("latest masterchain block"))
+                    .split(' ')[7]
+                const blockNumber = Number(block.split(':')[0].split(',')[2].replace(')', ''))
+                return {time, addr, block, blockNumber};
+            } catch (e) {
+                return {
+                    time: -1, addr: intToIP(obj.liteservers[l].ip) + ":" + obj.liteservers[l].port, block: ""
+                };
+            }
+        }))
+
+        const availableLiteservers = syncStates.filter(l => l.time !== -1);
+        const maxBlockNumber = Math.max(...availableLiteservers.map(l => l.blockNumber));
+        const unavailableLiteservers = syncStates.filter(l => l.time === -1);
+        const averageResponseTime = availableLiteservers.reduce((acc, el) => acc + el.time / availableLiteservers.length, 0);
+        const outOfSyncLiteservers = availableLiteservers.filter(l => maxBlockNumber - l.blockNumber > 2);
+
+        console.log('Online: ', availableLiteservers.map(l => l.addr))
+        console.log('Offline: ', unavailableLiteservers.map(l => l.addr))
+        console.log('Average response time: ', averageResponseTime + 'ms')
+        console.log('Out of sync: ', outOfSyncLiteservers.map(l => l.addr))
+
+        // TODO update mongo and express
     });
+
     setTimeout(checkLiteservers, config.liteservers.intervals.liteservers * 1000)
 }
 
