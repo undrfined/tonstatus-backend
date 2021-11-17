@@ -7,7 +7,7 @@ TON status app for contest
 Firstly, [install docker](https://docs.docker.com/engine/install/ubuntu/), then:
 ```sh
 git clone https://github.com/undrfined/tonstatus-backend --recurse-submodules
-cd tonstatus
+cd tonstatus-backend
 docker compose up
 ```
 
